@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="ink_high">#FFF9F1</color>
+    <color name="ink_muted">#C8D1D8</color>
+    <color name="ink_soft">#A7B2BA</color>
+    <color name="accent_gold">#E6B85C</color>
+    <color name="accent_deep">#3D6E5D</color>
+    <color name="library_bg">#FFFDFB</color>
+    <color name="library_text">#161316</color>
+    <color name="library_subtext">#817D83</color>
+    <color name="fresh_red">#F04459</color>
+    <color name="fresh_blue">#7E9DDE</color>
+    <color name="fresh_green">#51D88A</color>
+    <color name="fresh_yellow">#FCEB68</color>
+    <color name="player_text">#FFFFFFFF</color>
+    <color name="player_subtext">#CFC5CB</color>
+    <color name="player_lyric">#8B8087</color>
+</resources>

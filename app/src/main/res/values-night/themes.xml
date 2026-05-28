@@ -1,0 +1,11 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.MusicPlayer3" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">@color/library_bg</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="colorPrimary">@color/fresh_red</item>
+        <item name="colorSecondary">@color/fresh_blue</item>
+    </style>
+</resources>

@@ -1,0 +1,111 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.MusicPlayer3" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">@color/library_bg</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="colorPrimary">@color/fresh_red</item>
+        <item name="colorSecondary">@color/fresh_blue</item>
+    </style>
+
+    <style name="Theme.MusicPlayer3" parent="Base.Theme.MusicPlayer3" />
+
+    <style name="Widget" />
+    <style name="Widget.Music" />
+
+    <style name="Widget.Music.ActionButton" parent="Widget.Material3.Button">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">#1B1510</item>
+        <item name="backgroundTint">@color/accent_gold</item>
+        <item name="cornerRadius">8dp</item>
+    </style>
+
+    <style name="Widget.Music.OutlineButton" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/ink_high</item>
+        <item name="strokeColor">#55FFFFFF</item>
+        <item name="cornerRadius">8dp</item>
+    </style>
+
+    <style name="Widget.Music.IconButton">
+        <item name="android:layout_width">50dp</item>
+        <item name="android:layout_height">50dp</item>
+        <item name="android:background">@drawable/bg_icon_button</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:scaleType">center</item>
+    </style>
+
+    <style name="Widget.Music.PrimaryIconButton">
+        <item name="android:layout_width">64dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:background">@drawable/bg_primary_icon_button</item>
+        <item name="android:padding">15dp</item>
+        <item name="android:scaleType">center</item>
+    </style>
+
+    <style name="Widget.Music.CircleButton" parent="Widget.Material3.Button">
+        <item name="android:layout_width">62dp</item>
+        <item name="android:layout_height">62dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/fresh_red</item>
+        <item name="android:textSize">20sp</item>
+        <item name="backgroundTint">#FFFFFFFF</item>
+        <item name="cornerRadius">31dp</item>
+        <item name="elevation">8dp</item>
+    </style>
+
+    <style name="Widget.Music.CircleButton.Accent" parent="Widget.Music.CircleButton">
+        <item name="android:textColor">@color/fresh_red</item>
+        <item name="backgroundTint">#FFFFFFFF</item>
+    </style>
+
+    <style name="Widget.Music.TransparentIcon">
+        <item name="android:layout_width">46dp</item>
+        <item name="android:layout_height">46dp</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:scaleType">center</item>
+    </style>
+
+    <style name="Widget.Music.PlayerRoundButton" parent="Widget.Material3.Button">
+        <item name="android:layout_width">62dp</item>
+        <item name="android:layout_height">62dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/player_text</item>
+        <item name="android:textSize">22sp</item>
+        <item name="backgroundTint">#38FFFFFF</item>
+        <item name="cornerRadius">31dp</item>
+    </style>
+
+    <style name="Widget.Music.PlayerRoundIcon">
+        <item name="android:layout_width">58dp</item>
+        <item name="android:layout_height">58dp</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:padding">15dp</item>
+        <item name="android:scaleType">center</item>
+    </style>
+
+    <style name="Widget.Music.PlayerSmallButton" parent="Widget.Music.PlayerRoundButton">
+        <item name="android:layout_width">56dp</item>
+        <item name="android:layout_height">56dp</item>
+        <item name="android:textSize">18sp</item>
+        <item name="cornerRadius">28dp</item>
+    </style>
+
+    <style name="Widget.Music.PlayerBigIcon">
+        <item name="android:layout_width">96dp</item>
+        <item name="android:layout_height">80dp</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:padding">22dp</item>
+        <item name="android:scaleType">fitCenter</item>
+    </style>
+
+    <style name="Widget.Music.PlayerMainIcon">
+        <item name="android:layout_width">108dp</item>
+        <item name="android:layout_height">88dp</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:padding">20dp</item>
+        <item name="android:scaleType">fitCenter</item>
+    </style>
+</resources>
