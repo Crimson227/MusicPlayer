@@ -7,10 +7,12 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.database.Cursor;
+import android.graphics.Outline;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
+import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
@@ -28,6 +30,7 @@ import android.text.style.StyleSpan;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
@@ -56,6 +59,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -89,6 +95,7 @@ public class MainActivity extends AppCompatActivity {
     private int playMode;
     private int themeIndexValue;
     private int activeTab;
+    private int activeLyricLineIndex = -1;
     private String backgroundUri = "";
     private String searchQuery = "";
     private final Set<String> favoriteUris = new HashSet<>();
@@ -511,9 +518,11 @@ public class MainActivity extends AppCompatActivity {
     private void showSongDetails(Song song) {
         StringBuilder builder = new StringBuilder();
         builder.append("歌曲名称：").append(song.title).append("\n");
+        builder.append("歌手：").append(TextUtils.isEmpty(song.artist) ? "未知歌手" : song.artist).append("\n");
+        builder.append("专辑：").append(TextUtils.isEmpty(song.album) ? "未知专辑" : song.album).append("\n");
         builder.append("当前播放列表：").append(getActivePlaylist().name).append("\n");
         builder.append("歌词状态：").append(song.lyricsUri.isEmpty() ? "未关联" : "已关联").append("\n");
-        builder.append("封面状态：").append(song.coverUri.isEmpty() ? "默认封面" : "已设置").append("\n");
+        builder.append("封面状态：").append(song.coverUri.isEmpty() ? (song.embeddedCoverUri.isEmpty() ? "默认封面" : "自动解析") : "已设置").append("\n");
         builder.append("导入时间：").append(song.addedAt > 0 ? formatDateTime(song.addedAt) : "未知").append("\n");
         builder.append("文件名：").append(TextUtils.isEmpty(song.fileName) ? song.title : song.fileName).append("\n");
         builder.append("文件地址：").append(song.uri);
@@ -845,10 +854,38 @@ public class MainActivity extends AppCompatActivity {
         takeReadPermission(uri);
         Song song = findLibrarySong(uri.toString());
         if (song == null) {
-            song = new Song(queryDisplayName(uri), uri.toString());
-            song.fileName = queryFileName(uri);
+            String fileName = queryFileName(uri);
+            ParsedSongName parsedName = parseSongName(fileName);
+            AudioMetadata metadata = readAudioMetadata(uri);
+            String title = firstNonEmpty(metadata.title, parsedName.title);
+            if (looksLikeCombinedArtistTitle(title)) {
+                title = parsedName.title;
+            }
+            song = new Song(title, uri.toString());
+            song.fileName = fileName;
+            song.artist = firstNonEmpty(metadata.artist, parsedName.artist);
+            song.album = metadata.album;
+            song.embeddedCoverUri = metadata.embeddedCoverUri;
             song.addedAt = System.currentTimeMillis();
             librarySongs.add(song);
+        } else if (looksLikeCombinedArtistTitle(song.title)
+                || TextUtils.isEmpty(song.artist)
+                || TextUtils.isEmpty(song.album)
+                || TextUtils.isEmpty(song.embeddedCoverUri)) {
+            ParsedSongName parsedName = parseSongName(song.fileName);
+            AudioMetadata metadata = readAudioMetadata(uri);
+            if (looksLikeCombinedArtistTitle(song.title)) {
+                song.title = parsedName.title;
+            }
+            if (TextUtils.isEmpty(song.artist)) {
+                song.artist = firstNonEmpty(metadata.artist, parsedName.artist);
+            }
+            if (TextUtils.isEmpty(song.album)) {
+                song.album = metadata.album;
+            }
+            if (TextUtils.isEmpty(song.embeddedCoverUri)) {
+                song.embeddedCoverUri = metadata.embeddedCoverUri;
+            }
         }
         addSongToPlaylist(playlist, song);
     }
@@ -1003,6 +1040,86 @@ public class MainActivity extends AppCompatActivity {
 
     private String cleanTitle(String value) {
         return value == null ? "未命名歌曲" : value.replaceAll("\\.[A-Za-z0-9]{2,5}$", "");
+    }
+
+    private ParsedSongName parseSongName(String fileName) {
+        String clean = cleanTitle(fileName).trim();
+        Pattern pattern = Pattern.compile("^(.{1,40}?)\\s+[-–—_]\\s+(.{1,100})$");
+        Matcher matcher = pattern.matcher(clean);
+        if (matcher.matches()) {
+            String artist = cleanMetadataText(matcher.group(1));
+            String title = cleanMetadataText(matcher.group(2));
+            if (!artist.isEmpty() && !title.isEmpty()) {
+                return new ParsedSongName(title, artist);
+            }
+        }
+        return new ParsedSongName(clean.isEmpty() ? "未命名歌曲" : clean, "");
+    }
+
+    private boolean looksLikeCombinedArtistTitle(String value) {
+        return value != null && Pattern.compile("^.{1,40}?\\s+[-–—_]\\s+.{1,100}$").matcher(value.trim()).matches();
+    }
+
+    private AudioMetadata readAudioMetadata(Uri uri) {
+        AudioMetadata metadata = new AudioMetadata();
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(this, uri);
+            metadata.title = cleanMetadataText(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE));
+            metadata.artist = cleanMetadataText(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST));
+            metadata.album = cleanMetadataText(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM));
+            metadata.embeddedCoverUri = saveEmbeddedCover(uri, retriever.getEmbeddedPicture());
+        } catch (Exception ignored) {
+        } finally {
+            try {
+                retriever.release();
+            } catch (IOException | RuntimeException ignored) {
+            }
+        }
+        return metadata;
+    }
+
+    private String cleanMetadataText(String value) {
+        if (value == null) {
+            return "";
+        }
+        String clean = value.trim();
+        return clean.isEmpty() || "<unknown>".equalsIgnoreCase(clean) ? "" : clean;
+    }
+
+    private String firstNonEmpty(String preferred, String fallback) {
+        return TextUtils.isEmpty(preferred) ? fallback : preferred;
+    }
+
+    private String saveEmbeddedCover(Uri audioUri, byte[] coverBytes) {
+        if (coverBytes == null || coverBytes.length == 0) {
+            return "";
+        }
+        File directory = new File(getFilesDir(), "metadata_covers");
+        if (!directory.exists() && !directory.mkdirs()) {
+            return "";
+        }
+        File coverFile = new File(directory, "cover_" + Math.abs(audioUri.toString().hashCode()) + ".jpg");
+        try (FileOutputStream output = new FileOutputStream(coverFile)) {
+            output.write(coverBytes);
+            return Uri.fromFile(coverFile).toString();
+        } catch (IOException ignored) {
+            return "";
+        }
+    }
+
+    private String buildMetadataSubtitle(Song song) {
+        ArrayList<String> parts = new ArrayList<>();
+        if (!TextUtils.isEmpty(song.artist)) {
+            parts.add(song.artist);
+        }
+        if (!TextUtils.isEmpty(song.album)) {
+            parts.add(song.album);
+        }
+        if (parts.isEmpty()) {
+            parts.add(TextUtils.isEmpty(song.fileName) ? "本地歌曲" : song.fileName);
+        }
+        return TextUtils.join(" · ", parts);
     }
 
     private ArrayList<LyricLine> readLyrics(Uri uri) {
@@ -1586,10 +1703,7 @@ public class MainActivity extends AppCompatActivity {
         if (isCurrentSong(song) && mediaPlayer != null && prepared && mediaPlayer.isPlaying()) {
             return "正在播放";
         }
-        if (!song.lyricsUri.isEmpty()) {
-            return "已关联歌词";
-        }
-        return "本地歌曲";
+        return buildMetadataSubtitle(song);
     }
 
     private boolean isCurrentSong(Song song) {
@@ -1827,10 +1941,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void showAboutDialog() {
         showMessageDialog("关于应用", "MusicPlayer3\n"
-                + "移动软件设计课程音乐播放器\n\n"
-                + "核心功能：本地音乐导入、播放/暂停/停止、上一首/下一首、进度拖动、播放模式、播放列表、歌词关联、封面与背景设置。\n\n"
-                + "扩展功能：资料库分组、页内搜索、最近搜索、喜欢歌曲、最近播放、轻量外观方案与存储记录维护。\n\n"
-                + "数据说明：歌曲、列表、歌词、封面、背景、收藏、最近播放和搜索记录保存在本机 SharedPreferences 中。");
+                + "一个面向本地音乐管理与播放的课程实践应用。\n\n"
+                + "当前版本：1.0\n"
+                + "适用场景：导入设备中的音频文件，建立自己的资料库、播放列表和喜欢歌曲集合。\n\n"
+                + "隐私说明：应用不上传音乐文件或个人数据，播放记录、收藏、搜索历史和界面设置均保存在本机。\n\n"
+                + "开发说明：本应用为移动软件设计课程大作业作品，主要用于展示 Android 本地媒体播放、数据持久化和界面交互设计。");
     }
 
     private void tidyPlaylistReferences() {
@@ -1863,9 +1978,13 @@ public class MainActivity extends AppCompatActivity {
         String query = searchQuery == null ? "" : searchQuery.trim().toLowerCase(Locale.getDefault());
         for (Song song : librarySongs) {
             String fileName = song.fileName == null ? "" : song.fileName;
+            String artist = song.artist == null ? "" : song.artist;
+            String album = song.album == null ? "" : song.album;
             if (query.isEmpty()
                     || song.title.toLowerCase(Locale.getDefault()).contains(query)
-                    || fileName.toLowerCase(Locale.getDefault()).contains(query)) {
+                    || fileName.toLowerCase(Locale.getDefault()).contains(query)
+                    || artist.toLowerCase(Locale.getDefault()).contains(query)
+                    || album.toLowerCase(Locale.getDefault()).contains(query)) {
                 songs.add(song);
             }
         }
@@ -1903,14 +2022,15 @@ public class MainActivity extends AppCompatActivity {
 
     private String buildSongSubtitle(Song song) {
         ArrayList<String> parts = new ArrayList<>();
+        String metadata = buildMetadataSubtitle(song);
+        if (!TextUtils.isEmpty(metadata)) {
+            parts.add(metadata);
+        }
         if (favoriteUris.contains(song.uri)) {
             parts.add("我喜欢");
         }
         if (!song.lyricsUri.isEmpty()) {
             parts.add("已关联歌词");
-        }
-        if (parts.isEmpty()) {
-            parts.add("本地歌曲");
         }
         return TextUtils.join(" · ", parts);
     }
@@ -2078,6 +2198,7 @@ public class MainActivity extends AppCompatActivity {
         }
         releasePlayer();
         currentSongIndex = index;
+        activeLyricLineIndex = -1;
         Song song = playlist.songs.get(index);
         mediaPlayer = MediaPlayer.create(this, Uri.parse(song.uri));
         if (mediaPlayer == null) {
@@ -2175,19 +2296,35 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyCover(ImageView imageView, Song song, int fallback) {
+        applyRoundedClip(imageView, 12);
         imageView.setBackgroundResource(fallback);
         if (song != null && song.coverUri != null && !song.coverUri.isEmpty()) {
             imageView.setPadding(0, 0, 0, 0);
             imageView.setImageURI(Uri.parse(song.coverUri));
+        } else if (song != null && song.embeddedCoverUri != null && !song.embeddedCoverUri.isEmpty()) {
+            imageView.setPadding(0, 0, 0, 0);
+            imageView.setImageURI(Uri.parse(song.embeddedCoverUri));
         } else {
             imageView.setPadding(dp(10), dp(10), dp(10), dp(10));
             imageView.setImageResource(R.drawable.ic_music_note);
         }
     }
 
+    private void applyRoundedClip(ImageView imageView, int radiusDp) {
+        final float radius = dp(radiusDp);
+        imageView.setClipToOutline(true);
+        imageView.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+            }
+        });
+    }
+
     private void refreshNowPlaying() {
         Song song = getCurrentSong();
         if (song == null) {
+            activeLyricLineIndex = -1;
             songTitle.setText("未选择歌曲");
             songMeta.setText("通过菜单导入音乐");
             miniTitle.setText("选择一首歌曲");
@@ -2205,7 +2342,10 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         songTitle.setText(song.title);
-        String listLabel = favoriteUris.contains(song.uri) ? "我喜欢 · " + getActivePlaylist().name : getActivePlaylist().name;
+        String listLabel = buildMetadataSubtitle(song);
+        if (favoriteUris.contains(song.uri)) {
+            listLabel = listLabel + " · 我喜欢";
+        }
         songMeta.setText(listLabel);
         miniTitle.setText(song.title);
         miniSubtitle.setText(listLabel);
@@ -2254,27 +2394,38 @@ public class MainActivity extends AppCompatActivity {
     private void updateLyrics(int position) {
         Song song = getCurrentSong();
         if (song == null) {
+            activeLyricLineIndex = -1;
             return;
         }
         if (song.lyricLines.isEmpty() && !song.lyricsUri.isEmpty()) {
             song.lyricLines = readLyrics(Uri.parse(song.lyricsUri));
         }
         if (song.lyricLines.isEmpty()) {
+            activeLyricLineIndex = -1;
             lyricsView.setText("暂无歌词\n\n可在菜单中关联歌词");
             return;
         }
         LyricLine current = song.lyricLines.get(0);
         LyricLine next = null;
+        int currentIndex = 0;
         for (int i = 0; i < song.lyricLines.size(); i++) {
             LyricLine candidate = song.lyricLines.get(i);
             if (candidate.timeMs <= position) {
                 current = candidate;
+                currentIndex = i;
                 next = i + 1 < song.lyricLines.size() ? song.lyricLines.get(i + 1) : null;
             } else {
                 break;
             }
         }
+        if (currentIndex == activeLyricLineIndex) {
+            return;
+        }
+        activeLyricLineIndex = currentIndex;
         lyricsView.setText(buildLyricSpan(current.text, next == null ? "" : next.text));
+        lyricsView.setAlpha(0.35f);
+        lyricsView.setTranslationY(dp(18));
+        lyricsView.animate().alpha(1f).translationY(0).setDuration(260).start();
     }
 
     private SpannableStringBuilder buildLyricSpan(String current, String next) {
@@ -2350,6 +2501,7 @@ public class MainActivity extends AppCompatActivity {
                     JSONObject songJson = libraryArray.optJSONObject(i);
                     if (songJson != null) {
                         Song song = Song.fromJson(songJson);
+                        normalizeStoredMetadata(song);
                         if (findInList(librarySongs, song.uri) == null) {
                             librarySongs.add(song);
                         }
@@ -2397,6 +2549,19 @@ public class MainActivity extends AppCompatActivity {
             activeTab = 0;
         }
         ensurePlaylist();
+    }
+
+    private void normalizeStoredMetadata(Song song) {
+        if (song == null || TextUtils.isEmpty(song.fileName)) {
+            return;
+        }
+        ParsedSongName parsedName = parseSongName(song.fileName);
+        if (looksLikeCombinedArtistTitle(song.title)) {
+            song.title = parsedName.title;
+        }
+        if (TextUtils.isEmpty(song.artist)) {
+            song.artist = parsedName.artist;
+        }
     }
 
     private void saveState() {
@@ -2525,11 +2690,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static class Song {
-        final String title;
+        String title;
         final String uri;
         String fileName = "";
+        String artist = "";
+        String album = "";
         String lyricsUri = "";
         String coverUri = "";
+        String embeddedCoverUri = "";
         int playCount;
         long addedAt;
         long lastPlayedAt;
@@ -2545,8 +2713,11 @@ public class MainActivity extends AppCompatActivity {
             json.put("title", title);
             json.put("uri", uri);
             json.put("fileName", fileName);
+            json.put("artist", artist);
+            json.put("album", album);
             json.put("lyricsUri", lyricsUri);
             json.put("coverUri", coverUri);
+            json.put("embeddedCoverUri", embeddedCoverUri);
             json.put("playCount", playCount);
             json.put("addedAt", addedAt);
             json.put("lastPlayedAt", lastPlayedAt);
@@ -2556,8 +2727,11 @@ public class MainActivity extends AppCompatActivity {
         static Song fromJson(JSONObject json) {
             Song song = new Song(json.optString("title", "未命名歌曲"), json.optString("uri", ""));
             song.fileName = json.optString("fileName", "");
+            song.artist = json.optString("artist", "");
+            song.album = json.optString("album", "");
             song.lyricsUri = json.optString("lyricsUri", "");
             song.coverUri = json.optString("coverUri", "");
+            song.embeddedCoverUri = json.optString("embeddedCoverUri", "");
             song.playCount = json.optInt("playCount", 0);
             song.addedAt = json.optLong("addedAt", 0L);
             song.lastPlayedAt = json.optLong("lastPlayedAt", 0L);
@@ -2568,6 +2742,23 @@ public class MainActivity extends AppCompatActivity {
                 song.addedAt = song.lastPlayedAt > 0 ? song.lastPlayedAt : System.currentTimeMillis();
             }
             return song;
+        }
+    }
+
+    private static class AudioMetadata {
+        String title = "";
+        String artist = "";
+        String album = "";
+        String embeddedCoverUri = "";
+    }
+
+    private static class ParsedSongName {
+        final String title;
+        final String artist;
+
+        ParsedSongName(String title, String artist) {
+            this.title = title;
+            this.artist = artist;
         }
     }
 
