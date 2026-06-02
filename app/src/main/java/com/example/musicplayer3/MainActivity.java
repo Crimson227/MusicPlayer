@@ -39,6 +39,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -107,9 +108,10 @@ public class MainActivity extends AppCompatActivity {
     private FrameLayout playerOverlay;
     private LinearLayout libraryMenu;
     private LinearLayout songList;
-    private LinearLayout miniPlayer;
+    private FrameLayout miniPlayer;
     private TextView miniTitle;
     private TextView miniSubtitle;
+    private ProgressBar miniProgress;
     private TextView pageTitle;
     private TextView sectionTitle;
     private ImageView miniCover;
@@ -128,15 +130,15 @@ public class MainActivity extends AppCompatActivity {
     private ImageButton favoriteButton;
     private LinearLayout tabLibrary;
     private LinearLayout tabSearch;
-    private LinearLayout tabLikes;
+    private LinearLayout tabLists;
     private LinearLayout tabMine;
     private TextView tabLibraryIcon;
     private TextView tabSearchIcon;
-    private TextView tabLikesIcon;
+    private TextView tabListsIcon;
     private TextView tabMineIcon;
     private TextView tabLibraryLabel;
     private TextView tabSearchLabel;
-    private TextView tabLikesLabel;
+    private TextView tabListsLabel;
     private TextView tabMineLabel;
 
     private final Runnable progressTicker = new Runnable() {
@@ -171,6 +173,7 @@ public class MainActivity extends AppCompatActivity {
         miniPlayer = findViewById(R.id.miniPlayer);
         miniTitle = findViewById(R.id.miniTitle);
         miniSubtitle = findViewById(R.id.miniSubtitle);
+        miniProgress = findViewById(R.id.miniProgress);
         pageTitle = findViewById(R.id.pageTitle);
         sectionTitle = findViewById(R.id.sectionTitle);
         miniCover = findViewById(R.id.miniCover);
@@ -189,15 +192,15 @@ public class MainActivity extends AppCompatActivity {
         favoriteButton = findViewById(R.id.favoriteButton);
         tabLibrary = findViewById(R.id.tabLibrary);
         tabSearch = findViewById(R.id.tabSearch);
-        tabLikes = findViewById(R.id.tabLikes);
+        tabLists = findViewById(R.id.tabLists);
         tabMine = findViewById(R.id.tabMine);
         tabLibraryIcon = findViewById(R.id.tabLibraryIcon);
         tabSearchIcon = findViewById(R.id.tabSearchIcon);
-        tabLikesIcon = findViewById(R.id.tabLikesIcon);
+        tabListsIcon = findViewById(R.id.tabListsIcon);
         tabMineIcon = findViewById(R.id.tabMineIcon);
         tabLibraryLabel = findViewById(R.id.tabLibraryLabel);
         tabSearchLabel = findViewById(R.id.tabSearchLabel);
-        tabLikesLabel = findViewById(R.id.tabLikesLabel);
+        tabListsLabel = findViewById(R.id.tabListsLabel);
         tabMineLabel = findViewById(R.id.tabMineLabel);
     }
 
@@ -242,7 +245,7 @@ public class MainActivity extends AppCompatActivity {
         setAnimatedClickListener(miniPlayer, v -> showPlayer());
         setAnimatedClickListener(tabLibrary, v -> switchTab(0));
         setAnimatedClickListener(tabSearch, v -> switchTab(1));
-        setAnimatedClickListener(tabLikes, v -> switchTab(2));
+        setAnimatedClickListener(tabLists, v -> switchTab(2));
         setAnimatedClickListener(tabMine, v -> switchTab(3));
         setAnimatedClickListener(findViewById(R.id.showLibraryButton), v -> hidePlayer());
         setAnimatedClickListener(findViewById(R.id.collapseHandle), v -> hidePlayer());
@@ -397,7 +400,7 @@ public class MainActivity extends AppCompatActivity {
         } else if (activeTab == 1) {
             showSearchToolsDialog();
         } else if (activeTab == 2) {
-            showFavoritesToolsDialog();
+            showListsToolsDialog();
         } else {
             showAboutDialog();
         }
@@ -431,10 +434,10 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void showFavoritesToolsDialog() {
+    private void showListsToolsDialog() {
         String[] actions = {"去资料库选择歌曲", "查看最近播放"};
-        String[] subtitles = {"从全部歌曲中播放或收藏", "打开播放记录"};
-        showMenuDialog("喜欢", actions, subtitles, which -> {
+        String[] subtitles = {"从全部歌曲中播放或加入列表", "打开播放记录"};
+        showMenuDialog("列表", actions, subtitles, which -> {
             if (which == 0) switchTab(0);
             if (which == 1) showRecentPlayedDialog();
         });
@@ -454,14 +457,14 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void showFavoritesDialog() {
+    private void showLikedSongsDialog() {
         ArrayList<Song> songs = new ArrayList<>();
         for (Song song : librarySongs) {
             if (favoriteUris.contains(song.uri)) {
                 songs.add(song);
             }
         }
-        showSongPickerDialog("我喜欢", songs);
+        showSongPickerDialog("我喜欢的音乐", songs);
     }
 
     private void showRecentPlayedDialog() {
@@ -480,17 +483,310 @@ public class MainActivity extends AppCompatActivity {
             toast(title + "暂无歌曲");
             return;
         }
-        String[] names = new String[songs.size()];
-        String[] subtitles = new String[songs.size()];
+        showSongListDetailDialog(title, songs);
+    }
+
+    private void showSongListDetailDialog(String title, ArrayList<Song> songs) {
+        Dialog dialog = new Dialog(this);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(22), dp(18), dp(22), dp(14));
+        applyRoundBackground(panel, Color.WHITE, 26);
+        panel.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                getResources().getDisplayMetrics().heightPixels - dp(108)));
+
+        LinearLayout topBar = new LinearLayout(this);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        panel.addView(topBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
+
+        TextView back = new TextView(this);
+        back.setText("‹");
+        back.setGravity(Gravity.CENTER);
+        back.setTextColor(themeText());
+        back.setTextSize(34);
+        back.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        topBar.addView(back, new LinearLayout.LayoutParams(dp(44), ViewGroup.LayoutParams.MATCH_PARENT));
+        setAnimatedClickListener(back, v -> dialog.dismiss());
+
+        TextView topTitle = new TextView(this);
+        topTitle.setText(title);
+        topTitle.setTextColor(themeText());
+        topTitle.setTextSize(18);
+        topTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        topTitle.setGravity(Gravity.CENTER_VERTICAL);
+        topTitle.setPadding(0, dp(2), 0, 0);
+        topTitle.setSingleLine(true);
+        topTitle.setEllipsize(TextUtils.TruncateAt.END);
+        topBar.addView(topTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
+
+        ImageButton search = createTopIconButton(R.drawable.ic_search);
+        topBar.addView(search, new LinearLayout.LayoutParams(dp(44), ViewGroup.LayoutParams.MATCH_PARENT));
+        setAnimatedClickListener(search, v -> showSongListSearchDialog(title, songs));
+
+        ImageView cover = new ImageView(this);
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        Song firstSong = songs.get(0);
+        applyCover(cover, firstSong, getCoverResource(Math.max(0, librarySongs.indexOf(firstSong))));
+        LinearLayout.LayoutParams coverParams = new LinearLayout.LayoutParams(dp(154), dp(154));
+        coverParams.gravity = Gravity.CENTER_HORIZONTAL;
+        coverParams.setMargins(0, dp(16), 0, dp(16));
+        panel.addView(cover, coverParams);
+
+        TextView titleView = new TextView(this);
+        titleView.setText(title);
+        titleView.setTextColor(themeText());
+        titleView.setTextSize(25);
+        titleView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        titleView.setGravity(Gravity.CENTER);
+        titleView.setSingleLine(true);
+        titleView.setEllipsize(TextUtils.TruncateAt.END);
+        panel.addView(titleView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText(songs.size() + " 首歌曲");
+        subtitle.setTextColor(themeSubtext());
+        subtitle.setTextSize(15);
+        subtitle.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subtitleParams.setMargins(0, dp(4), 0, dp(16));
+        panel.addView(subtitle, subtitleParams);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48));
+        actionParams.setMargins(0, 0, 0, dp(18));
+        panel.addView(actions, actionParams);
+
+        ImageButton shuffle = createDetailIconButton(R.drawable.ic_mode_shuffle);
+        TextView play = createDetailActionButton("▶  播放", true);
+        actions.addView(shuffle, new LinearLayout.LayoutParams(dp(58), ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout.LayoutParams playParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1);
+        playParams.setMargins(dp(12), 0, dp(12), 0);
+        actions.addView(play, playParams);
+        setAnimatedClickListener(shuffle, v -> {
+            dialog.dismiss();
+            playSongList(songs, true);
+        });
+        setAnimatedClickListener(play, v -> {
+            dialog.dismiss();
+            playSongList(songs, false);
+        });
+
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.rgb(230, 226, 226));
+        panel.addView(divider, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(1))));
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout rows = new LinearLayout(this);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(rows);
         for (int i = 0; i < songs.size(); i++) {
-            names[i] = songs.get(i).title;
-            subtitles[i] = buildSongSubtitle(songs.get(i));
+            Song song = songs.get(i);
+            rows.addView(buildDetailSongRow(song, dialog), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            if (i < songs.size() - 1) {
+                View rowDivider = new View(this);
+                rowDivider.setBackgroundColor(Color.rgb(236, 232, 232));
+                LinearLayout.LayoutParams rowDividerParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(1)));
+                rowDividerParams.setMargins(dp(74), 0, 0, 0);
+                rows.addView(rowDivider, rowDividerParams);
+            }
         }
-        showMenuDialog(title, names, subtitles, which -> playSongFromLibrary(songs.get(which)));
+        panel.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        showCustomDialog(dialog, panel);
+    }
+
+    private void showSongListSearchDialog(String title, ArrayList<Song> songs) {
+        showInputPanel("搜索 " + title, "输入歌曲名或歌手", "", "搜索", keyword -> {
+            String clean = keyword == null ? "" : keyword.trim().toLowerCase(Locale.getDefault());
+            if (clean.isEmpty()) {
+                return;
+            }
+            ArrayList<Song> matches = new ArrayList<>();
+            for (Song song : songs) {
+                String name = song.title == null ? "" : song.title.toLowerCase(Locale.getDefault());
+                String artist = song.artist == null ? "" : song.artist.toLowerCase(Locale.getDefault());
+                String fileName = song.fileName == null ? "" : song.fileName.toLowerCase(Locale.getDefault());
+                if (name.contains(clean) || artist.contains(clean) || fileName.contains(clean)) {
+                    matches.add(song);
+                }
+            }
+            if (matches.isEmpty()) {
+                toast("没有找到匹配歌曲");
+            } else {
+                showSongListSearchResultsDialog(keyword.trim(), matches);
+            }
+        });
+    }
+
+    private void showSongListSearchResultsDialog(String keyword, ArrayList<Song> matches) {
+        Dialog dialog = new Dialog(this);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(22), dp(18), dp(22), dp(14));
+        applyRoundBackground(panel, Color.WHITE, 26);
+
+        LinearLayout topBar = new LinearLayout(this);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        panel.addView(topBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
+
+        TextView back = new TextView(this);
+        back.setText("‹");
+        back.setGravity(Gravity.CENTER);
+        back.setTextColor(themeText());
+        back.setTextSize(34);
+        back.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        topBar.addView(back, new LinearLayout.LayoutParams(dp(44), ViewGroup.LayoutParams.MATCH_PARENT));
+        setAnimatedClickListener(back, v -> dialog.dismiss());
+
+        LinearLayout titleGroup = new LinearLayout(this);
+        titleGroup.setOrientation(LinearLayout.VERTICAL);
+        titleGroup.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = new TextView(this);
+        title.setText("搜索结果");
+        title.setTextColor(themeText());
+        title.setTextSize(18);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView subtitle = new TextView(this);
+        subtitle.setText("“" + keyword + "” · " + matches.size() + " 首歌曲");
+        subtitle.setTextColor(themeSubtext());
+        subtitle.setTextSize(12);
+        titleGroup.addView(title);
+        titleGroup.addView(subtitle);
+        topBar.addView(titleGroup, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
+
+        View rightSpacer = new View(this);
+        topBar.addView(rightSpacer, new LinearLayout.LayoutParams(dp(44), ViewGroup.LayoutParams.MATCH_PARENT));
+
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.rgb(230, 226, 226));
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(1)));
+        dividerParams.setMargins(0, dp(12), 0, 0);
+        panel.addView(divider, dividerParams);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout rows = new LinearLayout(this);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(rows);
+        for (int i = 0; i < matches.size(); i++) {
+            rows.addView(buildDetailSongRow(matches.get(i), dialog), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            if (i < matches.size() - 1) {
+                View rowDivider = new View(this);
+                rowDivider.setBackgroundColor(Color.rgb(236, 232, 232));
+                LinearLayout.LayoutParams rowDividerParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(1)));
+                rowDividerParams.setMargins(dp(74), 0, 0, 0);
+                rows.addView(rowDivider, rowDividerParams);
+            }
+        }
+        int resultHeight = Math.min(dp(420), Math.max(dp(78), dp(80) * matches.size()));
+        panel.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, resultHeight));
+        showCustomDialog(dialog, panel);
+    }
+
+    private TextView createDetailActionButton(String text, boolean primary) {
+        TextView button = new TextView(this);
+        button.setText(text);
+        button.setGravity(Gravity.CENTER);
+        button.setTextSize(primary ? 17 : 22);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setTextColor(primary ? Color.WHITE : themeText());
+        applyRoundBackground(button, primary ? Color.BLACK : Color.rgb(235, 235, 236), 24);
+        return button;
+    }
+
+    private ImageButton createDetailIconButton(int iconRes) {
+        ImageButton button = new ImageButton(this);
+        button.setImageResource(iconRes);
+        button.setColorFilter(themeText());
+        button.setBackgroundColor(Color.TRANSPARENT);
+        button.setPadding(dp(15), dp(15), dp(15), dp(15));
+        button.setScaleType(ImageView.ScaleType.CENTER);
+        applyRoundBackground(button, Color.rgb(235, 235, 236), 24);
+        return button;
+    }
+
+    private ImageButton createTopIconButton(int iconRes) {
+        ImageButton button = new ImageButton(this);
+        button.setImageResource(iconRes);
+        button.setColorFilter(themeText());
+        button.setBackgroundColor(Color.TRANSPARENT);
+        button.setPadding(dp(10), dp(10), dp(10), dp(10));
+        button.setScaleType(ImageView.ScaleType.CENTER);
+        return button;
+    }
+
+    private View buildDetailSongRow(Song song, Dialog dialog) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(10), 0, dp(10));
+        row.setClickable(true);
+        row.setFocusable(true);
+
+        ImageView cover = new ImageView(this);
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        applyCover(cover, song, getCoverResource(Math.max(0, librarySongs.indexOf(song))));
+        row.addView(cover, new LinearLayout.LayoutParams(dp(58), dp(58)));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setPadding(dp(16), 0, dp(8), 0);
+        TextView name = new TextView(this);
+        name.setText(song.title);
+        name.setTextColor(themeText());
+        name.setTextSize(18);
+        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        texts.addView(name);
+
+        TextView meta = new TextView(this);
+        meta.setText(buildSongSubtitle(song));
+        meta.setTextColor(themeSubtext());
+        meta.setTextSize(14);
+        meta.setSingleLine(true);
+        meta.setEllipsize(TextUtils.TruncateAt.END);
+        texts.addView(meta);
+        row.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView more = new TextView(this);
+        more.setText("…");
+        more.setGravity(Gravity.CENTER);
+        more.setTextColor(themeSubtext());
+        more.setTextSize(24);
+        row.addView(more, new LinearLayout.LayoutParams(dp(38), dp(58)));
+
+        setAnimatedClickListener(row, v -> {
+            dialog.dismiss();
+            playSongFromLibrary(song);
+        });
+        setAnimatedClickListener(more, v -> {
+            dialog.dismiss();
+            showLibrarySongActionDialog(song);
+        });
+        return row;
+    }
+
+    private void playSongList(ArrayList<Song> songs, boolean shuffle) {
+        if (songs.isEmpty()) {
+            toast("列表暂无歌曲");
+            return;
+        }
+        Playlist playlist = getPlaybackQueuePlaylist();
+        playlist.songs.clear();
+        playlist.songs.addAll(songs);
+        currentSongIndex = shuffle ? random.nextInt(playlist.songs.size()) : 0;
+        saveState();
+        prepareAndMaybePlay(currentSongIndex, true);
+        refreshAll();
+        showPlayer();
     }
 
     private void playSongFromLibrary(Song song) {
-        Playlist playlist = getActivePlaylist();
+        Playlist playlist = getPlaybackQueuePlaylist();
         int index = playlist.songs.indexOf(song);
         if (index < 0) {
             playlist.songs.add(song);
@@ -910,12 +1206,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showAddFromLibraryDialog() {
+        showAddToPlaylistDialog(getActivePlaylist());
+    }
+
+    private void showAddToPlaylistDialog(Playlist playlist) {
         if (librarySongs.isEmpty()) {
             toast("资料库还没有歌曲，请先导入音乐");
             openAudioPicker();
             return;
         }
-        Playlist playlist = getActivePlaylist();
+        if (playlist == null) {
+            toast("请先创建播放列表");
+            return;
+        }
         boolean[] checked = new boolean[librarySongs.size()];
         for (int i = 0; i < librarySongs.size(); i++) {
             Song song = librarySongs.get(i);
@@ -1234,8 +1537,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateBottomTabs() {
-        TextView[] icons = {tabLibraryIcon, tabSearchIcon, tabLikesIcon, tabMineIcon};
-        TextView[] labels = {tabLibraryLabel, tabSearchLabel, tabLikesLabel, tabMineLabel};
+        TextView[] icons = {tabLibraryIcon, tabSearchIcon, tabListsIcon, tabMineIcon};
+        TextView[] labels = {tabLibraryLabel, tabSearchLabel, tabListsLabel, tabMineLabel};
         for (int i = 0; i < icons.length; i++) {
             int color = activeTab == i ? themeAccent() : themeSubtext();
             if (icons[i] != null) {
@@ -1295,14 +1598,14 @@ public class MainActivity extends AppCompatActivity {
         activeTab = Math.max(0, Math.min(activeTab, 3));
 
         if (activeTab == 0) {
-            setTopActions(true, true);
+            setTopActions(false, false);
             renderLibraryPage();
         } else if (activeTab == 1) {
             setTopActions(false, false);
             renderSearchPage();
         } else if (activeTab == 2) {
             setTopActions(false, false);
-            renderFavoritesPage();
+            renderListsPage();
         } else {
             setTopActions(false, false);
             renderSettingsPage();
@@ -1327,25 +1630,336 @@ public class MainActivity extends AppCompatActivity {
         sectionTitle.setVisibility(View.GONE);
 
         Playlist playlist = getActivePlaylist();
-        addGroupedMenuCard("我的音乐",
-                new String[]{"♫", "◷", "▣"},
-                new String[]{"全部歌曲", "最近添加", "歌曲文件"},
-                new String[]{"共 " + librarySongs.size() + " 首歌曲", "按导入时间查看音乐", "查看已导入歌曲的文件名"},
-                new View.OnClickListener[]{
-                        v -> showSongPickerDialog("全部歌曲", new ArrayList<>(librarySongs)),
-                        v -> showSongPickerDialog("最近添加", getRecentLibrarySongs()),
-                        v -> showSongPickerDialog("歌曲文件", new ArrayList<>(librarySongs))
-                });
-        addGroupedMenuCard("播放列表",
-                new String[]{"♬", "⊕"},
-                new String[]{"当前播放列表", "新建播放列表"},
-                new String[]{playlist.name + " · " + playlist.songs.size() + " 首", "创建一个新的歌单"},
-                new View.OnClickListener[]{v -> choosePlaylist(), v -> showCreatePlaylistDialog()});
-        addGroupedMenuCard("管理",
-                new String[]{"⇩", "⚙"},
-                new String[]{"导入音乐", "管理音乐资源"},
-                new String[]{"从设备中选择歌曲", "当前歌曲的歌词、封面与背景"},
-                new View.OnClickListener[]{v -> openAudioPicker(), v -> showEnhancedManageDialog()});
+        addImportHeroCard();
+        addLibraryQuickGrid(playlist);
+        addLibraryRecentSection();
+    }
+
+    private void addImportHeroCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackgroundResource(R.drawable.bg_library_hero);
+        card.setElevation(dp(3));
+        card.setPadding(dp(22), dp(20), dp(22), dp(18));
+        card.setClickable(true);
+        card.setFocusable(true);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.ic_folder_outline_white);
+        card.addView(icon, new LinearLayout.LayoutParams(dp(58), dp(58)));
+
+        TextView title = new TextView(this);
+        title.setText("导入本地音乐");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(28);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, dp(14), 0, 0);
+        card.addView(title, titleParams);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("扫描并添加设备中的音频文件");
+        subtitle.setTextColor(Color.argb(230, 255, 255, 255));
+        subtitle.setTextSize(16);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subtitleParams.setMargins(0, dp(6), 0, 0);
+        card.addView(subtitle, subtitleParams);
+
+        TextView action = new TextView(this);
+        action.setText("立即导入");
+        action.setTextColor(themeAccent());
+        action.setTextSize(16);
+        action.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        action.setGravity(Gravity.CENTER);
+        action.setBackgroundResource(R.drawable.bg_import_pill);
+        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(dp(126), dp(44));
+        actionParams.setMargins(0, dp(18), 0, 0);
+        card.addView(action, actionParams);
+
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.setMargins(0, dp(22), 0, dp(18));
+        libraryMenu.addView(card, cardParams);
+        setAnimatedClickListener(card, v -> openAudioPicker());
+        setAnimatedClickListener(action, v -> openAudioPicker());
+    }
+
+    private void addLibraryQuickGrid(Playlist playlist) {
+        int[] icons = {R.drawable.ic_history, R.drawable.ic_music_note, R.drawable.ic_artist, R.drawable.ic_folder_accent};
+        String[] titles = {"最近导入", "全部歌曲", "歌手分类", "音乐文件"};
+        String[] subtitles = {"按时间查看", librarySongs.size() + " 首", getArtistCount() + " 位歌手", "本地管理"};
+        View.OnClickListener[] listeners = {
+                v -> showSongPickerDialog("最近导入", getRecentLibrarySongs()),
+                v -> showSongPickerDialog("全部歌曲", new ArrayList<>(librarySongs)),
+                v -> showArtistCategoryDialog(),
+                v -> showSongPickerDialog("音乐文件", new ArrayList<>(librarySongs))
+        };
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackgroundResource(R.drawable.bg_group_card);
+        card.setElevation(dp(2));
+        card.setPadding(dp(14), dp(8), dp(14), dp(8));
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.setMargins(0, 0, 0, dp(10));
+        libraryMenu.addView(card, cardParams);
+
+        for (int rowIndex = 0; rowIndex < 2; rowIndex++) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (rowIndex == 0) {
+                rowParams.setMargins(0, 0, 0, dp(8));
+            }
+            card.addView(row, rowParams);
+
+            for (int col = 0; col < 2; col++) {
+                int index = rowIndex * 2 + col;
+                row.addView(buildLibraryQuickCell(icons[index], titles[index], subtitles[index], listeners[index]), new LinearLayout.LayoutParams(0, dp(88), 1));
+                if (col == 0) {
+                    View spacer = new View(this);
+                    row.addView(spacer, new LinearLayout.LayoutParams(dp(8), ViewGroup.LayoutParams.MATCH_PARENT));
+                }
+            }
+        }
+    }
+
+    private View buildLibraryQuickCell(int iconRes, String title, String subtitle, View.OnClickListener listener) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.HORIZONTAL);
+        cell.setGravity(Gravity.CENTER_VERTICAL);
+        cell.setPadding(dp(2), 0, dp(8), 0);
+        cell.setClickable(true);
+        cell.setFocusable(true);
+
+        ImageView iconView = new ImageView(this);
+        iconView.setImageResource(iconRes);
+        iconView.setColorFilter(themeAccent());
+        iconView.setPadding(dp(14), dp(14), dp(14), dp(14));
+        iconView.setBackgroundResource(R.drawable.bg_soft_icon_tile);
+        cell.addView(iconView, new LinearLayout.LayoutParams(dp(52), dp(52)));
+
+        LinearLayout textGroup = new LinearLayout(this);
+        textGroup.setOrientation(LinearLayout.VERTICAL);
+        textGroup.setPadding(dp(14), 0, 0, 0);
+        TextView titleView = new TextView(this);
+        titleView.setText(title);
+        titleView.setTextColor(themeText());
+        titleView.setTextSize(18);
+        titleView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        titleView.setSingleLine(true);
+        titleView.setEllipsize(TextUtils.TruncateAt.END);
+        TextView subtitleView = new TextView(this);
+        subtitleView.setText(subtitle);
+        subtitleView.setTextColor(themeSubtext());
+        subtitleView.setTextSize(14);
+        subtitleView.setSingleLine(true);
+        subtitleView.setEllipsize(TextUtils.TruncateAt.END);
+        textGroup.addView(titleView);
+        textGroup.addView(subtitleView);
+        cell.addView(textGroup, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        setAnimatedClickListener(cell, listener);
+        return cell;
+    }
+
+    private View buildLibraryQuickCard(String icon, String title, String subtitle, View.OnClickListener listener) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(18), 0, dp(14), 0);
+        card.setBackgroundResource(R.drawable.bg_library_quick_card);
+        card.setElevation(dp(2));
+        card.setClickable(true);
+        card.setFocusable(true);
+
+        TextView iconView = new TextView(this);
+        iconView.setText(icon);
+        iconView.setTextColor(themeAccent());
+        iconView.setTextSize(28);
+        iconView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        iconView.setGravity(Gravity.CENTER);
+        iconView.setBackgroundResource(R.drawable.bg_soft_icon_tile);
+        card.addView(iconView, new LinearLayout.LayoutParams(dp(52), dp(52)));
+
+        LinearLayout textGroup = new LinearLayout(this);
+        textGroup.setOrientation(LinearLayout.VERTICAL);
+        textGroup.setPadding(dp(16), 0, 0, 0);
+        TextView titleView = new TextView(this);
+        titleView.setText(title);
+        titleView.setTextColor(themeText());
+        titleView.setTextSize(18);
+        titleView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        titleView.setSingleLine(true);
+        titleView.setEllipsize(TextUtils.TruncateAt.END);
+        TextView subtitleView = new TextView(this);
+        subtitleView.setText(subtitle);
+        subtitleView.setTextColor(themeSubtext());
+        subtitleView.setTextSize(14);
+        subtitleView.setSingleLine(true);
+        subtitleView.setEllipsize(TextUtils.TruncateAt.END);
+        textGroup.addView(titleView);
+        textGroup.addView(subtitleView);
+        card.addView(textGroup, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        setAnimatedClickListener(card, listener);
+        return card;
+    }
+
+    private int getArtistCount() {
+        Set<String> artists = new HashSet<>();
+        for (Song song : librarySongs) {
+            artists.add(getArtistName(song));
+        }
+        return artists.size();
+    }
+
+    private String getArtistName(Song song) {
+        if (song == null || TextUtils.isEmpty(song.artist)) {
+            return "未知歌手";
+        }
+        return song.artist.trim();
+    }
+
+    private void showArtistCategoryDialog() {
+        if (librarySongs.isEmpty()) {
+            toast("资料库暂无歌曲");
+            return;
+        }
+        ArrayList<String> artists = new ArrayList<>();
+        ArrayList<Integer> counts = new ArrayList<>();
+        for (Song song : librarySongs) {
+            String artist = getArtistName(song);
+            int index = artists.indexOf(artist);
+            if (index < 0) {
+                artists.add(artist);
+                counts.add(1);
+            } else {
+                counts.set(index, counts.get(index) + 1);
+            }
+        }
+        ArrayList<Integer> order = new ArrayList<>();
+        for (int i = 0; i < artists.size(); i++) {
+            order.add(i);
+        }
+        Collections.sort(order, (left, right) -> artists.get(left).compareToIgnoreCase(artists.get(right)));
+
+        String[] names = new String[order.size()];
+        String[] subtitles = new String[order.size()];
+        for (int i = 0; i < order.size(); i++) {
+            int index = order.get(i);
+            names[i] = artists.get(index);
+            subtitles[i] = counts.get(index) + " 首歌曲";
+        }
+        showMenuDialog("歌手分类", names, subtitles, which -> {
+            int index = order.get(which);
+            showSongPickerDialog(artists.get(index), getSongsByArtist(artists.get(index)));
+        });
+    }
+
+    private ArrayList<Song> getSongsByArtist(String artist) {
+        ArrayList<Song> songs = new ArrayList<>();
+        for (Song song : librarySongs) {
+            if (getArtistName(song).equals(artist)) {
+                songs.add(song);
+            }
+        }
+        Collections.sort(songs, (left, right) -> left.title.compareToIgnoreCase(right.title));
+        return songs;
+    }
+
+    private void addLibraryRecentSection() {
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        headerParams.setMargins(0, dp(20), 0, dp(12));
+        libraryMenu.addView(header, headerParams);
+
+        TextView title = new TextView(this);
+        title.setText("最近播放");
+        title.setTextColor(themeText());
+        title.setTextSize(25);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView viewAll = new TextView(this);
+        viewAll.setText("查看全部  ›");
+        viewAll.setTextColor(themeAccent());
+        viewAll.setTextSize(15);
+        viewAll.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        viewAll.setGravity(Gravity.CENTER);
+        header.addView(viewAll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)));
+        setAnimatedClickListener(viewAll, v -> showSongPickerDialog("最近播放", getLibraryRecentPreviewSongs()));
+
+        ArrayList<Song> songs = getLibraryRecentPreviewSongs();
+        if (songs.isEmpty()) {
+            addEmptyState(libraryMenu, "还没有音乐", "先导入本地音乐后，这里会显示最近播放", "立即导入", () -> openAudioPicker());
+            return;
+        }
+
+        int limit = Math.min(3, songs.size());
+        for (int i = 0; i < limit; i++) {
+            libraryMenu.addView(buildLibraryRecentRow(songs.get(i)), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            if (i < limit - 1) {
+                View divider = new View(this);
+                divider.setBackgroundColor(Color.rgb(236, 232, 232));
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(1)));
+                params.setMargins(dp(78), 0, 0, 0);
+                libraryMenu.addView(divider, params);
+            }
+        }
+    }
+
+    private ArrayList<Song> getLibraryRecentPreviewSongs() {
+        ArrayList<Song> songs = getRecentPlayedSongs();
+        if (songs.isEmpty()) {
+            songs = getRecentLibrarySongs();
+        }
+        return songs;
+    }
+
+    private View buildLibraryRecentRow(Song song) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(12), 0, dp(12));
+        row.setClickable(true);
+        row.setFocusable(true);
+
+        ImageView cover = new ImageView(this);
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        applyCover(cover, song, getCoverResource(Math.max(0, librarySongs.indexOf(song))));
+        row.addView(cover, new LinearLayout.LayoutParams(dp(64), dp(64)));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setPadding(dp(18), 0, dp(8), 0);
+        TextView title = new TextView(this);
+        title.setText(song.title);
+        title.setTextColor(themeText());
+        title.setTextSize(20);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        TextView subtitle = new TextView(this);
+        subtitle.setText(buildSongSubtitle(song));
+        subtitle.setTextColor(themeSubtext());
+        subtitle.setTextSize(15);
+        subtitle.setSingleLine(true);
+        subtitle.setEllipsize(TextUtils.TruncateAt.END);
+        texts.addView(title);
+        texts.addView(subtitle);
+        row.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView more = new TextView(this);
+        more.setText("⋮");
+        more.setGravity(Gravity.CENTER);
+        more.setTextColor(themeText());
+        more.setTextSize(27);
+        row.addView(more, new LinearLayout.LayoutParams(dp(42), dp(64)));
+
+        setAnimatedClickListener(row, v -> playSongFromLibrary(song));
+        setAnimatedClickListener(more, v -> showLibrarySongActionDialog(song));
+        return row;
     }
 
     private void renderSearchPage() {
@@ -1359,26 +1973,277 @@ public class MainActivity extends AppCompatActivity {
         renderSearchResults();
     }
 
-    private void renderFavoritesPage() {
-        pageTitle.setText("喜欢");
+    private void renderListsPage() {
+        pageTitle.setText("列表");
         libraryMenu.setVisibility(View.VISIBLE);
-        songList.setVisibility(View.VISIBLE);
+        songList.setVisibility(View.GONE);
         sectionTitle.setVisibility(View.GONE);
 
         ArrayList<Song> songs = getFavoriteSongs();
-        addSectionTitle(libraryMenu, "收藏歌曲");
-        TextView count = new TextView(this);
-        count.setText("共 " + songs.size() + " 首");
-        count.setTextColor(themeSubtext());
-        count.setTextSize(18);
-        LinearLayout.LayoutParams countParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        countParams.setMargins(0, dp(8), 0, dp(18));
-        libraryMenu.addView(count, countParams);
+        addLikedSongsCard(songs);
+        addPlaylistCollectionSection();
+    }
+
+    private void addLikedSongsCard(ArrayList<Song> songs) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setBackgroundResource(R.drawable.bg_group_card);
+        card.setElevation(dp(2));
+        card.setPadding(dp(16), dp(14), dp(16), dp(14));
+
+        TextView icon = new TextView(this);
+        icon.setText("♡");
+        icon.setTextColor(themeAccent());
+        icon.setTextSize(28);
+        icon.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackgroundResource(R.drawable.bg_soft_icon_tile);
+        card.addView(icon, new LinearLayout.LayoutParams(dp(58), dp(58)));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setPadding(dp(16), 0, dp(8), 0);
+
+        TextView title = new TextView(this);
+        title.setText("我喜欢的音乐");
+        title.setTextColor(themeText());
+        title.setTextSize(20);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        texts.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText(songs.size() + " 首歌曲 · 系统列表");
+        subtitle.setTextColor(themeSubtext());
+        subtitle.setTextSize(14);
+        texts.addView(subtitle);
+        card.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.VERTICAL);
+        card.addView(buttons, new LinearLayout.LayoutParams(dp(94), ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView playAll = buildFavoriteHeroButton("播放全部", true);
+        TextView shuffle = buildFavoriteHeroButton("随机播放", false);
+        buttons.addView(playAll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34)));
+        LinearLayout.LayoutParams shuffleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34));
+        shuffleParams.setMargins(0, dp(8), 0, 0);
+        buttons.addView(shuffle, shuffleParams);
+
+        setAnimatedClickListener(playAll, v -> playLikedSongs(false));
+        setAnimatedClickListener(shuffle, v -> playLikedSongs(true));
+        setAnimatedClickListener(card, v -> showSongPickerDialog("我喜欢的音乐", getFavoriteSongs()));
+
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.setMargins(0, dp(18), 0, dp(24));
+        libraryMenu.addView(card, cardParams);
+    }
+
+    private TextView buildFavoriteHeroButton(String text, boolean primary) {
+        TextView button = new TextView(this);
+        button.setText(text);
+        button.setTextSize(13);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setGravity(Gravity.CENTER);
+        button.setTextColor(primary ? themeAccent() : Color.WHITE);
+        applyRoundBackground(button, primary ? Color.rgb(255, 240, 243) : themeAccent(), 18);
+        return button;
+    }
+
+    private void playLikedSongs(boolean shuffle) {
+        ArrayList<Song> songs = getFavoriteSongs();
         if (songs.isEmpty()) {
-            addEmptyState(songList, "还没有喜欢的歌曲", "播放歌曲时点击爱心即可收藏", "去资料库选择歌曲", () -> switchTab(0));
-        } else {
-            renderFavoritesGrid(songList, songs);
+            toast("我喜欢的音乐暂无歌曲");
+            return;
         }
+        Playlist playlist = getPlaybackQueuePlaylist();
+        playlist.songs.clear();
+        playlist.songs.addAll(songs);
+        currentSongIndex = shuffle ? random.nextInt(playlist.songs.size()) : 0;
+        saveState();
+        prepareAndMaybePlay(currentSongIndex, true);
+        refreshAll();
+        showPlayer();
+    }
+
+    private void addPlaylistCollectionSection() {
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        headerParams.setMargins(0, 0, 0, dp(14));
+        libraryMenu.addView(header, headerParams);
+
+        TextView title = new TextView(this);
+        title.setText("我的播放列表");
+        title.setTextColor(themeText());
+        title.setTextSize(24);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView add = new TextView(this);
+        add.setText("＋");
+        add.setTextColor(themeAccent());
+        add.setTextSize(24);
+        add.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        add.setGravity(Gravity.CENTER);
+        header.addView(add, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        setAnimatedClickListener(add, v -> showCreatePlaylistDialog());
+
+        ArrayList<Playlist> userPlaylists = getUserCreatedPlaylists();
+        if (userPlaylists.isEmpty()) {
+            addCreatePlaylistPrompt();
+            return;
+        }
+        renderPlaylistGrid(libraryMenu, userPlaylists);
+    }
+
+    private ArrayList<Playlist> getUserCreatedPlaylists() {
+        ArrayList<Playlist> userPlaylists = new ArrayList<>();
+        for (Playlist playlist : playlists) {
+            if (!isSystemPlaylist(playlist)) {
+                userPlaylists.add(playlist);
+            }
+        }
+        return userPlaylists;
+    }
+
+    private void renderPlaylistGrid(LinearLayout target, ArrayList<Playlist> userPlaylists) {
+        LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        target.addView(grid, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        for (int i = 0; i < userPlaylists.size(); i += 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.TOP);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rowParams.setMargins(0, 0, 0, dp(20));
+            grid.addView(row, rowParams);
+
+            row.addView(buildPlaylistTile(userPlaylists.get(i)), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            if (i + 1 < userPlaylists.size()) {
+                row.addView(buildPlaylistTile(userPlaylists.get(i + 1)), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            } else {
+                View spacer = new View(this);
+                row.addView(spacer, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            }
+        }
+    }
+
+    private View buildPlaylistTile(Playlist playlist) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setPadding(dp(6), 0, dp(6), 0);
+        tile.setClickable(true);
+        tile.setFocusable(true);
+
+        ImageView cover = new ImageView(this);
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        if (playlist.songs.isEmpty()) {
+            applyRoundedClip(cover, 16);
+            cover.setBackgroundResource(R.drawable.bg_album_pink);
+            cover.setPadding(dp(24), dp(24), dp(24), dp(24));
+            cover.setImageResource(R.drawable.ic_music_note);
+        } else {
+            Song first = playlist.songs.get(0);
+            applyCover(cover, first, getCoverResource(Math.max(0, librarySongs.indexOf(first))));
+        }
+        tile.addView(cover, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(164)));
+
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams titleRowParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleRowParams.setMargins(0, dp(8), 0, 0);
+        tile.addView(titleRow, titleRowParams);
+
+        TextView title = new TextView(this);
+        title.setText(playlist.name);
+        title.setTextColor(themeText());
+        title.setTextSize(16);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        titleRow.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        ImageButton add = createTileIconButton(R.drawable.ic_add, true);
+        titleRow.addView(add, new LinearLayout.LayoutParams(dp(32), dp(32)));
+
+        ImageButton play = createTileIconButton(R.drawable.ic_play_dark, false);
+        titleRow.addView(play, new LinearLayout.LayoutParams(dp(32), dp(32)));
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText(playlist.songs.size() + " 首歌曲");
+        subtitle.setTextColor(themeSubtext());
+        subtitle.setTextSize(14);
+        subtitle.setSingleLine(true);
+        subtitle.setEllipsize(TextUtils.TruncateAt.END);
+        tile.addView(subtitle);
+
+        setAnimatedClickListener(tile, v -> showSongPickerDialog(playlist.name, new ArrayList<>(playlist.songs)));
+        setAnimatedClickListener(add, v -> showAddToPlaylistDialog(playlist));
+        setAnimatedClickListener(play, v -> playPlaylist(playlist, false));
+        return tile;
+    }
+
+    private ImageButton createTileIconButton(int iconRes, boolean accent) {
+        ImageButton button = new ImageButton(this);
+        button.setImageResource(iconRes);
+        button.setColorFilter(accent ? themeAccent() : themeText());
+        button.setBackgroundColor(Color.TRANSPARENT);
+        button.setPadding(dp(7), dp(7), dp(7), dp(7));
+        button.setScaleType(ImageView.ScaleType.CENTER);
+        return button;
+    }
+
+    private void playPlaylist(Playlist playlist, boolean shuffle) {
+        if (playlist == null || playlist.songs.isEmpty()) {
+            toast("播放列表暂无歌曲");
+            return;
+        }
+        activePlaylistIndex = playlists.indexOf(playlist);
+        if (activePlaylistIndex < 0) {
+            activePlaylistIndex = 0;
+        }
+        currentSongIndex = shuffle ? random.nextInt(playlist.songs.size()) : 0;
+        saveState();
+        prepareAndMaybePlay(currentSongIndex, true);
+        refreshAll();
+        showPlayer();
+    }
+
+    private Playlist getPlaybackQueuePlaylist() {
+        for (int i = 0; i < playlists.size(); i++) {
+            Playlist playlist = playlists.get(i);
+            if ("当前播放".equals(playlist.name)) {
+                activePlaylistIndex = i;
+                return playlist;
+            }
+        }
+        Playlist playlist = new Playlist("当前播放");
+        playlists.add(playlist);
+        activePlaylistIndex = playlists.size() - 1;
+        return playlist;
+    }
+
+    private boolean isSystemPlaylist(Playlist playlist) {
+        return playlist == null
+                || "我的喜欢".equals(playlist.name)
+                || "我喜欢的音乐".equals(playlist.name)
+                || "当前播放".equals(playlist.name);
+    }
+
+    private void addCreatePlaylistPrompt() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackgroundResource(R.drawable.bg_group_card);
+        card.setElevation(dp(2));
+        card.setPadding(dp(14), dp(8), dp(14), dp(8));
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.setMargins(0, 0, 0, dp(18));
+        libraryMenu.addView(card, cardParams);
+        addGroupedMenuRow(card, "＋", "新建播放列表", "创建一个新的收藏列表", v -> showCreatePlaylistDialog());
     }
 
     private void renderSettingsPage() {
@@ -1566,7 +2431,7 @@ public class MainActivity extends AppCompatActivity {
         }
         for (String label : labels) {
             TextView chip = new TextView(this);
-            chip.setText("◷  " + label);
+            chip.setText(label);
             chip.setTextColor(themeText());
             chip.setTextSize(15);
             chip.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -1589,20 +2454,71 @@ public class MainActivity extends AppCompatActivity {
         songList.removeAllViews();
         String query = searchQuery == null ? "" : searchQuery.trim();
         if (query.isEmpty()) {
-            addEmptyState(songList, "输入关键词查找资料库歌曲", "搜索歌曲名、歌手或文件名后显示结果", "导入音乐", () -> openAudioPicker());
+            addSearchIdleHint(songList);
             return;
         }
-        addSectionTitle(songList, "搜索结果");
         ArrayList<Song> songs = getSearchSongs();
         if (songs.isEmpty()) {
+            addSearchResultsHeader(songList, 0);
             addEmptyState(songList, "没有找到匹配歌曲", "可导入音乐或尝试其他关键词", "清除搜索", () -> {
                 searchQuery = "";
                 saveState();
                 refreshAll();
             });
         } else {
+            addSearchResultsHeader(songList, songs.size());
             renderSongListCard(songList, songs, false);
         }
+    }
+
+    private void addSearchIdleHint(LinearLayout target) {
+        LinearLayout hint = new LinearLayout(this);
+        hint.setOrientation(LinearLayout.VERTICAL);
+        hint.setPadding(dp(18), dp(18), dp(18), dp(18));
+        hint.setBackgroundResource(R.drawable.bg_group_card);
+        hint.setElevation(dp(2));
+
+        TextView title = new TextView(this);
+        title.setText("输入关键词查找资料库歌曲");
+        title.setTextColor(themeText());
+        title.setTextSize(18);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        hint.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("搜索歌曲名、歌手或文件名后显示结果");
+        subtitle.setTextColor(themeSubtext());
+        subtitle.setTextSize(14);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subtitleParams.setMargins(0, dp(6), 0, 0);
+        hint.addView(subtitle, subtitleParams);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(18), 0, 0);
+        target.addView(hint, params);
+    }
+
+    private void addSearchResultsHeader(LinearLayout target, int count) {
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.BOTTOM);
+        LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        headerParams.setMargins(0, dp(18), 0, dp(12));
+        target.addView(header, headerParams);
+
+        TextView title = new TextView(this);
+        title.setText("搜索结果");
+        title.setTextColor(themeText());
+        title.setTextSize(22);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView summary = new TextView(this);
+        summary.setText("找到 " + count + " 首歌曲");
+        summary.setTextColor(themeSubtext());
+        summary.setTextSize(14);
+        summary.setGravity(Gravity.RIGHT);
+        header.addView(summary, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     }
 
     private void renderSongListCard(LinearLayout target, ArrayList<Song> songs, boolean showFavoriteHeart) {
@@ -1626,21 +2542,22 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void renderFavoritesGrid(LinearLayout target, ArrayList<Song> songs) {
+    private void renderLikedSongsGrid(LinearLayout target, ArrayList<Song> songs, int maxItems) {
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
         target.addView(grid, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        for (int i = 0; i < songs.size(); i += 2) {
+        int count = Math.min(songs.size(), maxItems);
+        for (int i = 0; i < count; i += 2) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.TOP);
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            rowParams.setMargins(0, 0, 0, dp(18));
+            rowParams.setMargins(0, 0, 0, dp(20));
             grid.addView(row, rowParams);
 
             row.addView(buildFavoriteTile(songs.get(i)), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-            if (i + 1 < songs.size()) {
+            if (i + 1 < count) {
                 row.addView(buildFavoriteTile(songs.get(i + 1)), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
             } else {
                 View spacer = new View(this);
@@ -1662,18 +2579,15 @@ public class MainActivity extends AppCompatActivity {
         applyCover(cover, song, getCoverResource(Math.max(0, librarySongs.indexOf(song))));
         coverFrame.addView(cover, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        TextView more = new TextView(this);
-        more.setText("…");
-        more.setGravity(Gravity.CENTER);
-        more.setTextColor(Color.WHITE);
-        more.setTextSize(22);
-        applyRoundBackground(more, Color.argb(95, 0, 0, 0), 18);
-        FrameLayout.LayoutParams moreParams = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.TOP | Gravity.RIGHT);
-        moreParams.setMargins(0, dp(8), dp(8), 0);
-        coverFrame.addView(more, moreParams);
-
         LinearLayout.LayoutParams coverParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(164));
         tile.addView(coverFrame, coverParams);
+
+        LinearLayout textRow = new LinearLayout(this);
+        textRow.setOrientation(LinearLayout.HORIZONTAL);
+        textRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams textRowParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        textRowParams.setMargins(0, dp(8), 0, 0);
+        tile.addView(textRow, textRowParams);
 
         TextView title = new TextView(this);
         title.setText(song.title);
@@ -1682,9 +2596,14 @@ public class MainActivity extends AppCompatActivity {
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        titleParams.setMargins(0, dp(8), 0, 0);
-        tile.addView(title, titleParams);
+        textRow.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView more = new TextView(this);
+        more.setText("…");
+        more.setGravity(Gravity.CENTER);
+        more.setTextColor(themeSubtext());
+        more.setTextSize(19);
+        textRow.addView(more, new LinearLayout.LayoutParams(dp(28), dp(28)));
 
         TextView subtitle = new TextView(this);
         subtitle.setText(getFavoriteTileSubtitle(song));
@@ -1890,7 +2809,7 @@ public class MainActivity extends AppCompatActivity {
     private void showStorageManagementDialog() {
         String overview = "资料库：" + librarySongs.size() + " 首\n"
                 + "播放列表：" + playlists.size() + " 个\n"
-                + "收藏歌曲：" + favoriteUris.size() + " 首\n"
+                + "我喜欢的音乐：" + favoriteUris.size() + " 首\n"
                 + "最近播放：" + recentPlayedUris.size() + " 条\n"
                 + "最近搜索：" + recentSearchQueries.size() + " 条";
         String[] actions = {"查看存储概况", "整理播放列表引用", "清理最近播放记录", "清理最近搜索记录"};
@@ -1943,7 +2862,7 @@ public class MainActivity extends AppCompatActivity {
         showMessageDialog("关于应用", "MusicPlayer3\n"
                 + "一个面向本地音乐管理与播放的课程实践应用。\n\n"
                 + "当前版本：1.0\n"
-                + "适用场景：导入设备中的音频文件，建立自己的资料库、播放列表和喜欢歌曲集合。\n\n"
+                + "适用场景：导入设备中的音频文件，建立自己的资料库、播放列表和我喜欢的音乐。\n\n"
                 + "隐私说明：应用不上传音乐文件或个人数据，播放记录、收藏、搜索历史和界面设置均保存在本机。\n\n"
                 + "开发说明：本应用为移动软件设计课程大作业作品，主要用于展示 Android 本地媒体播放、数据持久化和界面交互设计。");
     }
@@ -2027,7 +2946,7 @@ public class MainActivity extends AppCompatActivity {
             parts.add(metadata);
         }
         if (favoriteUris.contains(song.uri)) {
-            parts.add("我喜欢");
+            parts.add("已喜欢");
         }
         if (!song.lyricsUri.isEmpty()) {
             parts.add("已关联歌词");
@@ -2042,21 +2961,22 @@ public class MainActivity extends AppCompatActivity {
         }
         currentSongIndex = index;
         Song song = playlist.songs.get(index);
-        String favoriteAction = favoriteUris.contains(song.uri) ? "取消收藏" : "加入我喜欢";
-        String[] actions = {favoriteAction, "查看歌曲详情", "关联歌词", "设置歌曲封面", "从当前列表移除"};
-        String[] subtitles = {"同步到喜欢页", "歌词、封面与文件信息", "选择 txt 或 lrc 歌词文件", "为歌曲指定封面图片", "资料库歌曲不会被删除"};
+        String favoriteAction = favoriteUris.contains(song.uri) ? "取消喜欢" : "加入我喜欢";
+        String[] actions = {favoriteAction, "添加到播放列表", "查看歌曲详情", "关联歌词", "设置歌曲封面", "从当前列表移除"};
+        String[] subtitles = {"同步到我喜欢的音乐", "选择一个列表加入", "歌词、封面与文件信息", "选择 txt 或 lrc 歌词文件", "为歌曲指定封面图片", "资料库歌曲不会被删除"};
         showMenuDialog(song.title, actions, subtitles, which -> {
             if (which == 0) toggleFavorite(song);
-            if (which == 1) showSongDetails(song);
-            if (which == 2) {
+            if (which == 1) showAddSongToPlaylistDialog(song);
+            if (which == 2) showSongDetails(song);
+            if (which == 3) {
                 currentSongIndex = index;
                 openLyricsPicker();
             }
-            if (which == 3) {
+            if (which == 4) {
                 currentSongIndex = index;
                 openCoverPicker();
             }
-            if (which == 4) confirmDeleteSong(index);
+            if (which == 5) confirmDeleteSong(index);
         });
     }
 
@@ -2071,19 +2991,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showLibraryOnlySongActionDialog(Song song) {
-        String favoriteAction = favoriteUris.contains(song.uri) ? "取消收藏" : "加入我喜欢";
-        String[] actions = {"播放这首歌", "添加到当前列表", favoriteAction, "查看歌曲详情"};
-        String[] subtitles = {"播放时会加入当前列表", "只添加引用，不复制文件", "同步到喜欢页", "歌词、封面与文件信息"};
+        String favoriteAction = favoriteUris.contains(song.uri) ? "取消喜欢" : "加入我喜欢";
+        String[] actions = {"播放这首歌", "添加到播放列表", favoriteAction, "查看歌曲详情"};
+        String[] subtitles = {"播放时会加入当前播放", "选择一个列表加入", "同步到我喜欢的音乐", "歌词、封面与文件信息"};
         showMenuDialog(song.title, actions, subtitles, which -> {
             if (which == 0) playSongFromLibrary(song);
-            if (which == 1) {
-                addSongToPlaylist(getActivePlaylist(), song);
-                saveState();
-                refreshAll();
-                toast("已添加到当前列表");
-            }
+            if (which == 1) showAddSongToPlaylistDialog(song);
             if (which == 2) toggleFavorite(song);
             if (which == 3) showSongDetails(song);
+        });
+    }
+
+    private void showAddSongToPlaylistDialog(Song song) {
+        ArrayList<Playlist> userPlaylists = getUserCreatedPlaylists();
+        if (userPlaylists.isEmpty()) {
+            showConfirmPanel("还没有播放列表", "先创建一个播放列表，再把歌曲加入其中。", "新建列表", () -> showCreatePlaylistDialog());
+            return;
+        }
+        String[] names = new String[userPlaylists.size()];
+        String[] subtitles = new String[userPlaylists.size()];
+        for (int i = 0; i < userPlaylists.size(); i++) {
+            Playlist playlist = userPlaylists.get(i);
+            names[i] = playlist.name;
+            subtitles[i] = playlistContains(playlist, song.uri) ? "已在列表中" : playlist.songs.size() + " 首歌曲";
+        }
+        showMenuDialog("添加到播放列表", names, subtitles, which -> {
+            Playlist playlist = userPlaylists.get(which);
+            boolean added = addSongToPlaylist(playlist, song);
+            saveState();
+            refreshAll();
+            toast(added ? "已添加到“" + playlist.name + "”" : "歌曲已在“" + playlist.name + "”中");
         });
     }
 
@@ -2094,7 +3031,7 @@ public class MainActivity extends AppCompatActivity {
         }
         if (favoriteUris.contains(song.uri)) {
             favoriteUris.remove(song.uri);
-            toast("已取消收藏");
+            toast("已取消喜欢");
         } else {
             favoriteUris.add(song.uri);
             toast("已加入我喜欢");
@@ -2276,6 +3213,9 @@ public class MainActivity extends AppCompatActivity {
             mediaPlayer.seekTo(0);
         }
         progressSeek.setProgress(0);
+        if (miniProgress != null) {
+            miniProgress.setProgress(0);
+        }
         currentTime.setText("00:00");
         updateRemainingTime(0);
         refreshNowPlaying();
@@ -2332,6 +3272,10 @@ public class MainActivity extends AppCompatActivity {
             lyricsView.setText("暂无歌词\n\n可在菜单中关联歌词");
             progressSeek.setMax(0);
             progressSeek.setProgress(0);
+            if (miniProgress != null) {
+                miniProgress.setMax(100);
+                miniProgress.setProgress(0);
+            }
             currentTime.setText("00:00");
             totalTime.setText("-00:00");
             statusText.setText("已暂停");
@@ -2344,7 +3288,7 @@ public class MainActivity extends AppCompatActivity {
         songTitle.setText(song.title);
         String listLabel = buildMetadataSubtitle(song);
         if (favoriteUris.contains(song.uri)) {
-            listLabel = listLabel + " · 我喜欢";
+            listLabel = listLabel + " · 已喜欢";
         }
         songMeta.setText(listLabel);
         miniTitle.setText(song.title);
@@ -2354,6 +3298,10 @@ public class MainActivity extends AppCompatActivity {
         int cover = getCoverResource(currentSongIndex);
         applyCover(miniCover, song, cover);
         applyCover(playerCover, song, cover);
+        if (miniProgress != null && mediaPlayer != null && prepared) {
+            miniProgress.setMax(Math.max(1, mediaPlayer.getDuration()));
+            miniProgress.setProgress(Math.max(0, mediaPlayer.getCurrentPosition()));
+        }
     }
     private void refreshMode() {
         int[] icons = {R.drawable.ic_mode_repeat, R.drawable.ic_mode_repeat_one, R.drawable.ic_mode_shuffle};
@@ -2379,6 +3327,10 @@ public class MainActivity extends AppCompatActivity {
         int position = mediaPlayer.getCurrentPosition();
         if (!userSeeking) {
             progressSeek.setProgress(position);
+            if (miniProgress != null) {
+                miniProgress.setMax(Math.max(1, mediaPlayer.getDuration()));
+                miniProgress.setProgress(position);
+            }
             currentTime.setText(formatTime(position));
             updateRemainingTime(position);
         }
@@ -2466,7 +3418,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void ensurePlaylist() {
         if (playlists.isEmpty()) {
-            playlists.add(new Playlist("我的喜欢"));
+            playlists.add(new Playlist("当前播放"));
+            activePlaylistIndex = 0;
         }
     }
 

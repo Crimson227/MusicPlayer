@@ -23,3 +23,4 @@ local.properties
 *_musicplayer3_*.png
 phase2_launch.png
 window_*.xml
+outputs/doc_audit/
